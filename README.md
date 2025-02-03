@@ -54,27 +54,7 @@ This project aims to predict cryptocurrency price movements by combining **histo
 
 ---
 
-## 🚀 Implementation Plan
 
-### **Day 1:** Data Collection & Preprocessing
-
-✔ Download Kaggle dataset and clean data.
-✔ Scrape Twitter data and process sentiment.
-✔ Engineer features for models.
-
-### **Day 2:** Model Training & Evaluation
-
-✔ Train ML models for price prediction.
-✔ Test classification models for buy/sell decisions.
-✔ Evaluate model performance (RMSE, accuracy, etc.).
-
-### **Day 3:** AI Integration & Final Report
-
-✔ Integrate GPT API for AI-powered insights.
-✔ Backtest predictions using past data.
-✔ Write final report with visualizations.
-
----
 
 ## ⚡ Technologies Used
 
