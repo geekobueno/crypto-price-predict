@@ -1,20 +1,32 @@
 import pandas as pd
+import numpy as np
 from typing import List
 
 class TargetGenerator:
     @staticmethod
-    def add_targets(df: pd.DataFrame, horizons: List[int] = [1, 3, 7]) -> pd.DataFrame:
-        """Add target variables for different prediction horizons"""
-        target_df = df.copy()
+    def add_targets(df: pd.DataFrame, prediction_horizons: List[int]) -> pd.DataFrame:
+        """Generate target variables for different prediction horizons"""
+        df = df.copy()
         
-        for horizon in horizons:
-            # Price change
-            target_df[f'target_return_{horizon}d'] = target_df['close'].pct_change(horizon).shift(-horizon)
+        for horizon in prediction_horizons:
+            # Future price
+            df[f'future_price_{horizon}d'] = df.groupby('symbol')['close'].transform(
+                lambda x: x.shift(-horizon)
+            )
             
-            # Binary direction
-            target_df[f'target_direction_{horizon}d'] = (target_df[f'target_return_{horizon}d'] > 0).astype(int)
+            # Return
+            df[f'return_{horizon}d'] = (
+                (df[f'future_price_{horizon}d'] - df['close']) / df['close']
+            )
+            
+            # Binary direction (1 if price goes up, 0 if down)
+            df[f'direction_{horizon}d'] = (
+                df[f'future_price_{horizon}d'] > df['close']
+            ).astype(int)
             
             # Volatility target
-            target_df[f'target_volatility_{horizon}d'] = target_df['close'].rolling(window=horizon).std().shift(-horizon)
+            df[f'volatility_{horizon}d'] = df.groupby('symbol')['close'].transform(
+                lambda x: x.rolling(window=horizon).std() / x.rolling(window=horizon).mean()
+            )
         
-        return target_df
+        return df

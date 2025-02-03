@@ -1,34 +1,49 @@
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
-from typing import Dict, Optional
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from typing import List
 
 class DataProcessor:
     def __init__(self):
-        self.scalers: Dict[str, MinMaxScaler] = {}
-    
-    def scale_features(self, df: pd.DataFrame, symbol: str) -> pd.DataFrame:
-        """Scale numerical features to [0,1] range"""
-        scaled_df = df.copy()
-        
-        # Columns to exclude from scaling
-        exclude_columns = ['dates', 'symbol'] + [col for col in df.columns if 'target' in col]
-        
-        # Columns to scale
-        scale_columns = [col for col in df.columns if col not in exclude_columns]
-        
-        # Initialize scaler for this symbol if not exists
-        if symbol not in self.scalers:
-            self.scalers[symbol] = MinMaxScaler()
-            
-        # Scale features
-        scaled_data = self.scalers[symbol].fit_transform(df[scale_columns])
-        scaled_df[scale_columns] = scaled_data
-        
-        return scaled_df
+        self.scalers = {}
     
     def clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Clean the dataframe by removing NaN values and duplicates"""
-        cleaned_df = df.copy()
-        cleaned_df.dropna(inplace=True)
-        cleaned_df.drop_duplicates(subset=['dates'], inplace=True)
-        return cleaned_df
+        """Clean the dataframe by removing invalid entries and handling missing values"""
+        df = df.copy()
+        
+        # Remove rows with invalid prices
+        df = df[df['close'] > 0]
+        df = df[df['volume'] > 0]
+        
+        # Forward fill missing values for technical indicators
+        technical_columns = [col for col in df.columns if col not in 
+                           ['symbol', 'date', 'open', 'high', 'low', 'close', 'volume']]
+        df[technical_columns] = df[technical_columns].fillna(method='ffill')
+        
+        # Remove rows with any remaining NaN values
+        df = df.dropna()
+        
+        return df
+    
+    def scale_features(self, df: pd.DataFrame, features_to_scale: List[str]) -> pd.DataFrame:
+        """Scale numerical features using StandardScaler"""
+        df = df.copy()
+        
+        for symbol in df['symbol'].unique():
+            symbol_data = df[df['symbol'] == symbol]
+            
+            # Create or get scaler for this symbol
+            if symbol not in self.scalers:
+                self.scalers[symbol] = {}
+            
+            # Scale each feature
+            for feature in features_to_scale:
+                if feature in df.columns:
+                    if feature not in self.scalers[symbol]:
+                        self.scalers[symbol][feature] = StandardScaler()
+                        
+                    values = symbol_data[feature].values.reshape(-1, 1)
+                    scaled_values = self.scalers[symbol][feature].fit_transform(values)
+                    df.loc[symbol_data.index, f'{feature}_scaled'] = scaled_values
+        
+        return df
