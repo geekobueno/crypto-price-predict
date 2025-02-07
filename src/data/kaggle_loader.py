@@ -42,7 +42,7 @@ class KaggleDataLoader:
             df.columns = [col.lower().strip() for col in df.columns]
             
             # Ensure required columns exist
-            required_columns = ['symbol', 'dates', 'open', 'high', 'low', 'close', 'volume']
+            required_columns = ['symbol', 'dates', 'open', 'high', 'low', 'close', 'volume', 'adj_close']
             for col in required_columns:
                 if col not in df.columns:
                     raise ValueError(f"Required column '{col}' not found in dataset")
