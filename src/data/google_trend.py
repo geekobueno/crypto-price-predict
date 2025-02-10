@@ -1,111 +1,80 @@
-from pytrends.request import TrendReq
 import pandas as pd
-import time
-from datetime import datetime, timedelta
+from pytrends.request import TrendReq
 import logging
-from typing import Optional, Dict, List
+from typing import Optional, Dict
+from datetime import datetime
+import os
+from pathlib import Path
 
 class GoogleTrendsFetcher:
     def __init__(self):
         """Initialize the Google Trends API client."""
-        self.pytrends = TrendReq(hl='en-US', tz=360)
-        self.retry_count = 3
-        self.sleep_time = 5  # seconds between retries
-        
-    def fetch_trends(self, crypto_name: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
+        try:
+            self.pytrends = TrendReq(hl='en-US', tz=360)
+            logging.info("Google Trends client initialized successfully")
+        except Exception as e:
+            logging.error(f"Failed to initialize Google Trends client: {e}")
+            raise
+
+    def fetch_trends(self, keyword: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
         """
-        Fetch Google Trends data for a cryptocurrency.
+        Fetch Google Trends data for a specific keyword and time period.
         
         Args:
-            crypto_name (str): Name of the cryptocurrency
-            start_date (str): Start date in format 'YYYY-MM-DD'
-            end_date (str): End date in format 'YYYY-MM-DD'
+            keyword (str): Search term to get trends for
+            start_date (str): Start date in YYYY-MM-DD format
+            end_date (str): End date in YYYY-MM-DD format
             
         Returns:
-            Optional[pd.DataFrame]: DataFrame containing trends data or None if fetch fails
-        """
-        search_terms = [
-            crypto_name,
-            f"{crypto_name} crypto",
-            f"{crypto_name} price"
-        ]
-        
-        for attempt in range(self.retry_count):
-            try:
-                # Build payload
-                self.pytrends.build_payload(
-                    kw_list=search_terms,
-                    cat=0,
-                    timeframe=f'{start_date} {end_date}',
-                    geo='',
-                    gprop=''
-                )
-                
-                # Get interest over time
-                trends_df = self.pytrends.interest_over_time()
-                
-                if not trends_df.empty:
-                    # Remove isPartial column and reset index
-                    trends_df = trends_df.drop('isPartial', axis=1)
-                    trends_df.reset_index(inplace=True)
-                    
-                    # Rename date column
-                    trends_df.rename(columns={'date': 'timestamp'}, inplace=True)
-                    
-                    return trends_df
-                    
-            except Exception as e:
-                logging.warning(f"Attempt {attempt + 1} failed: {e}")
-                if attempt < self.retry_count - 1:
-                    time.sleep(self.sleep_time)
-                    continue
-                else:
-                    logging.error(f"Failed to fetch Google Trends data for {crypto_name}")
-                    return None
-        
-        return None
-    
-    def fetch_related_queries(self, crypto_name: str, start_date: str, end_date: str) -> Optional[Dict]:
-        """
-        Fetch related queries for a cryptocurrency.
-        
-        Args:
-            crypto_name (str): Name of the cryptocurrency
-            start_date (str): Start date in format 'YYYY-MM-DD'
-            end_date (str): End date in format 'YYYY-MM-DD'
-            
-        Returns:
-            Optional[Dict]: Dictionary containing related queries or None if fetch fails
+            Optional[pd.DataFrame]: DataFrame with trends data or None if failed
         """
         try:
-            self.pytrends.build_payload(
-                kw_list=[crypto_name],
-                cat=0,
-                timeframe=f'{start_date} {end_date}',
-                geo='',
-                gprop=''
-            )
+            timeframe = f"{start_date} {end_date}"
+            self.pytrends.build_payload([keyword], timeframe=timeframe)
             
-            related_queries = self.pytrends.related_queries()
-            return related_queries.get(crypto_name, None)
+            df = self.pytrends.interest_over_time()
+            if df.empty:
+                logging.warning(f"No trends data found for {keyword}")
+                return None
+                
+            # Clean up the DataFrame
+            if 'isPartial' in df.columns:
+                df = df.drop('isPartial', axis=1)
+                
+            df = df.reset_index()
+            df.columns = ['date'] + [col for col in df.columns if col != 'date']
+            
+            logging.info(f"Successfully fetched trends data for {keyword}")
+            return df
             
         except Exception as e:
-            logging.error(f"Failed to fetch related queries: {e}")
+            logging.error(f"Error fetching Google Trends data for {keyword}: {e}")
             return None
-            
-    def save_trends_data(self, df: pd.DataFrame, crypto_name: str, output_path: str) -> str:
+
+    def save_trends_data(self, df: pd.DataFrame, keyword: str, output_path: str) -> Optional[str]:
         """
         Save trends data to CSV file.
         
         Args:
             df (pd.DataFrame): DataFrame containing trends data
-            crypto_name (str): Name of the cryptocurrency
+            keyword (str): Keyword used for the search
             output_path (str): Directory to save the file
             
         Returns:
-            str: Path to the saved file
+            Optional[str]: Path to saved file or None if failed
         """
-        filename = f"{crypto_name.lower()}_google_trends.csv"
-        filepath = os.path.join(output_path, filename)
-        df.to_csv(filepath, index=False)
-        return filepath
+        try:
+            os.makedirs(output_path, exist_ok=True)
+            
+            safe_name = keyword.lower().replace(' ', '_')
+            timestamp = datetime.now().strftime('%Y%m%d')
+            filename = f"{safe_name}_trends_{timestamp}.csv"
+            filepath = os.path.join(output_path, filename)
+            
+            df.to_csv(filepath, index=False)
+            logging.info(f"Saved trends data to {filepath}")
+            return filepath
+            
+        except Exception as e:
+            logging.error(f"Error saving trends data for {keyword}: {e}")
+            return None

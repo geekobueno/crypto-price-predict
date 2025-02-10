@@ -172,3 +172,10 @@ cython_debug/
 
 #crypto downloaded and porcessed data
 crypto_data/
+
+*csv
+wiki_data/
+google_data/
+crypto_model_final/
+crypto_results
+logs/
